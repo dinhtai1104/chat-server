@@ -17,11 +17,12 @@ public class RoomDAO extends DAO{
 
 
     public Room createRoom(Room room) {
-        String sql = "insert into tblroom(name) value(?)";
+        String sql = "insert into tblroom(name, type) value(?,?)";
 
         try {
             PreparedStatement ps = con.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS);
             ps.setString(1, "");
+            ps.setString(2, ( room.getType() == null ) ? "2" : room.getType() );
 //            ps.setDate(2, room.getCreateDate());
             ps.executeUpdate();
             ResultSet rs = ps.getGeneratedKeys();
@@ -66,6 +67,26 @@ public class RoomDAO extends DAO{
             e.printStackTrace();
         }
         return true;
+    }
+
+    public void createRoom(List<User> list) {
+        if (list.size() > 2) {
+            System.out.println("yeu cau tao phong nhom");
+            Room room = new Room();
+            room.setType("many");
+            room = createRoom(room);
+            for (User u : list) {
+                new UserInRoomDAO().joinRoom(u.getId(), room.getId());
+            }
+        } else if (list.size() == 2) {
+            System.out.println("yeu cau tao phong doi");
+            Room room = new Room();
+            room.setType("2");
+            room = createRoom(room);
+            for (User u : list) {
+                new UserInRoomDAO().joinRoom(u.getId(), room.getId());
+            }
+        }
     }
     
 

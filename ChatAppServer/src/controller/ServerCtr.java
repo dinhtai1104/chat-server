@@ -238,6 +238,9 @@ public class ServerCtr {
                                     List<User> list = new UserDAO().findUsersByFullName(key);
                                     ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_SEARCH);
                                     sendData(sender);
+                                } else if (data.getChoice() == ConnectionType.CREATEROOM) {
+                                    List<User> list = (List<User>) data.getData();
+                                    new RoomDAO().createRoom(list);
                                 }
                             } 
                         }
