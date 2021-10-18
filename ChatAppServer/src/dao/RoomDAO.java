@@ -25,7 +25,7 @@ public class RoomDAO extends DAO{
             ps.setString(2, ( room.getType() == null ) ? "2" : room.getType() );
 //            ps.setDate(2, room.getCreateDate());
             ps.executeUpdate();
-            ResultSet rs = ps.getGeneratedKeys();
+            ResultSet rs = ps.getGeneratedKeys( );
             if (rs.next()) {
                 room.setId(rs.getInt(1));
                 System.out.println(room.getId());

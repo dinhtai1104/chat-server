@@ -22,7 +22,7 @@ public class DAO {
     private void initDAO() {
         if (con == null) {
             
-            String dbUrl = "jdbc:mysql://35.194.160.94:3306/chatapp";
+            String dbUrl = "jdbc:mysql://localhost:3306/chatapp";
             String dbClass = "com.mysql.jdbc.Driver";
 
             try {

@@ -241,6 +241,9 @@ public class ServerCtr {
                                 } else if (data.getChoice() == ConnectionType.CREATEROOM) {
                                     List<User> list = (List<User>) data.getData();
                                     new RoomDAO().createRoom(list);
+                                } else if (data.getChoice() == ConnectionType.EDITPROFILE) {
+                                    User u = (User)data.getData();
+                                    new UserDAO().updateAccount(u);
                                 }
                             } 
                         }
@@ -254,7 +257,7 @@ public class ServerCtr {
     //                publicClientNumber();
                     try {
                         mySocket.close();
-                    }catch(Exception ex) {
+                    }catch(Exception ex) {  
                         ex.printStackTrace();
                     }
                     this.stop();
