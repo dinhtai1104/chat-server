@@ -160,9 +160,9 @@ public class ServerCtr {
                                     String rs = dao.createAccount(user) == true ? "ok" : "false";
                                     sendData(new ObjectWrapper(rs, ConnectionType.REPLY_REGISTER));
                                 } else if (data.getChoice() == ConnectionType.ONLINE_INFORM) {
-                                    User user = (User)data.getData();
-                                    ObjectWrapper sendToAll = new ObjectWrapper(user.getId(), ConnectionType.ONLINE_INFORM);
-                                    sendDataAll(sendToAll);
+                                    int user = (int)data.getData();
+                                    this.idUser = user;
+                                    new UserDAO().setOnlineOffline(idUser, true);
                                 } else if (data.getChoice() == ConnectionType.OFFLINE_INFORM) {
                                     User user = (User)data.getData();
                                     ObjectWrapper sendToAll = new ObjectWrapper(user.getId(), ConnectionType.OFFLINE_INFORM);
@@ -196,23 +196,23 @@ public class ServerCtr {
 
                                     FriendRequest fr = (FriendRequest)data.getData();
                                     new FriendRequestDAO().acceptRequest(fr);
-                                    List<User> friendList = new FriendDAO().getFriends(fr.getReceiver().getId());
-                                    List<Object> list = new ArrayList<Object>();
-                                    list.add(fr.getReceiver().getId());
-                                    list.add(list);
-                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_ADDFRIEND);
+//                                    List<User> friendList = new FriendDAO().getFriends(fr.getReceiver().getId());
+//                                    List<Object> list = new ArrayList<Object>();
+//                                    list.add(fr.getReceiver().getId());
+//                                    list.add(list);
+//                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_ADDFRIEND);
     //                                sendDataAll(sender);
 
                                 } else if (data.getChoice() == ConnectionType.DECLINEFRIEND) {
                                     FriendRequest fr = (FriendRequest)data.getData();
                                     new FriendRequestDAO().deleteRequest(fr);
-                                    List<User> friendList = new FriendDAO().getFriends(fr.getReceiver().getId());
-
-                                    List<Object> list = new ArrayList<Object>();
-                                    list.add(fr.getReceiver().getId());
-                                    list.add(list);
-
-                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_DECLINEFRIEND);
+//                                    List<User> friendList = new FriendDAO().getFriends(fr.getReceiver().getId());
+//
+//                                    List<Object> list = new ArrayList<Object>();
+//                                    list.add(fr.getReceiver().getId());
+//                                    list.add(list);
+//
+//                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_DECLINEFRIEND);
     //                                sendData(sender);
     //                                sendDataAll(sender);
                                 } else if( data.getChoice() == ConnectionType.INVITEROOM ) {
@@ -268,6 +268,7 @@ public class ServerCtr {
     }
     
     public static void main(String[] args) {
-        new ServerCtr( new IPAddress("192.168.1.103",  9086) );
+        new ServerCtr( new IPAddress("192.168.1.106",  9086) );
+        new UDPCtr(1000);
     }
 }
