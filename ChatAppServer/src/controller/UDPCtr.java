@@ -7,6 +7,7 @@ package controller;
 
 import dao.FriendDAO;
 import dao.FriendRequestDAO;
+import dao.MessageDAO;
 import dao.RoomDAO;
 import dao.UserDAO;
 import dao.UserInRoomDAO;
@@ -22,6 +23,7 @@ import java.util.List;
 import model.ConnectionType;
 import model.FriendRequest;
 import model.IPAddress;
+import model.Message;
 import model.ObjectWrapper;
 import model.Room;
 import model.User;
@@ -92,6 +94,10 @@ public class UDPCtr {
                             user = (User)(receivedData.getData());
                             user = new UserDAO().checkLogin(user);
                             resultData.setChoice(ConnectionType.REPLY_LOGIN);
+                            
+                            if (user != null) {
+                                new UserDAO().setOnlineOffline(user.getId(), true);
+                            }
                             resultData.setData(user);
                             System.out.println("Login");
 //                            if (user != null) {
@@ -112,7 +118,7 @@ public class UDPCtr {
                             int userId = (int)receivedData.getData();
                             List<Room> listRoom = new UserInRoomDAO().getListRoom(userId);
                             resultData = new ObjectWrapper(listRoom, ConnectionType.REPLY_GETROOM);
-                            System.out.println("Get Request Update Room UI");
+//                            System.out.println("Get Request Update Room UI");
                             break;
                         case GETFRIEND:
                             int idUser = (int)receivedData.getData();
@@ -141,6 +147,30 @@ public class UDPCtr {
                             int userid = (int)receivedData.getData();
                             List<FriendRequest> list2 = new FriendRequestDAO().getFriendRequests(userid);
                             resultData = new ObjectWrapper(list2, ConnectionType.REPLY_GETFRIENDREQUEST);
+                            break;
+                        case FRIENDREQUEST:
+                            fr = (FriendRequest) receivedData.getData();
+                            new FriendRequestDAO().sendRequest(fr);
+                            break;
+                        case EDITPROFILE:
+                            User u = (User)receivedData.getData();
+                            new UserDAO().updateAccount(u);
+                            break;
+                        case OFFLINE_INFORM:
+                            int id = (int)receivedData.getData();
+                            new UserDAO().setOnlineOffline(id, false);
+                            break;
+                        case CHAT:
+                            Message message = (Message)receivedData.getData();
+                            if (new MessageDAO().saveMessage(message)) {
+                                List<Message> listM = new MessageDAO().getMessages(message.getRoom().getId());
+                                resultData = new ObjectWrapper(listM, ConnectionType.REPLY_CHAT);
+//                                ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_CHAT);
+//                                sendDataAll(sender);
+                                System.out.println("Sent To Client");
+                            } else {
+                                System.out.println("Loi khi save Message");
+                            }
                             break;
                     }
                     

@@ -20,7 +20,14 @@ import java.util.ArrayList;
  
 import dao.UserDAO;
 import dao.UserInRoomDAO;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.util.List;
+import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import model.ConnectionType;
 import model.FriendRequest;
 import model.IPAddress;
@@ -31,12 +38,18 @@ import model.User;
 import model.UserInRoom;
  
 public class ServerCtr {
+    public static ArrayList<Integer> listPortUDP = new ArrayList<Integer>();
+    
+    //--------------------TCP------------------------------
     private ServerSocket myServer;
     private ServerListening myListening;
     private ArrayList<ServerProcessing> myProcess;
     private IPAddress myAddress = new IPAddress("192.168.1.103",8888);  //default server host and port
-     
-
+    
+    //---------------------UDP------------------------------
+    private IPAddress udpServerAddress = new IPAddress("localhost", 1000);
+    
+    
      
     public ServerCtr(IPAddress ip){
         myProcess = new ArrayList<ServerProcessing>();
@@ -68,6 +81,28 @@ public class ServerCtr {
         }catch(Exception e) {
             e.printStackTrace();
         }
+    }
+    
+    public int getPortForUDPServer() {
+        Random rd = new Random();
+        while(true) {
+            int port = rd.nextInt(5000) + 1001;
+            boolean accept = true;
+            for (int t : listPortUDP) {
+                if (t == port) {
+                    accept = false;
+                    break;
+                }
+            }
+            if (accept) {
+                listPortUDP.add(port);
+                return port;
+            }
+            if (listPortUDP.size() > 1000) {
+                break;
+            }
+        }
+        return 1;
     }
      
 //    public void publicClientNumber() {
@@ -115,12 +150,27 @@ public class ServerCtr {
     class ServerProcessing extends Thread{
         private Socket mySocket;
         private int idUser = 0;
+        
+        //FOR UDP
+        private DatagramSocket udpClient;
+        private int port;
+        
         //private ObjectInputStream ois;
         //private ObjectOutputStream oos;
          
         public ServerProcessing(Socket s) {
             super();
             mySocket = s;
+            port = getPortForUDPServer();
+            try {
+                udpClient = new DatagramSocket(port);
+                System.out.println("Connect to UDP at " + udpServerAddress.getHost() + " and port: " + port);
+                
+                
+            } catch (SocketException ex) {
+                Logger.getLogger(ServerCtr.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
         }
          
         public void sendData(Object obj) {
@@ -131,6 +181,48 @@ public class ServerCtr {
                 e.printStackTrace();
             }
         }
+        //UDP---------------------------------------
+        public boolean sendDataToUDP(ObjectWrapper data) {
+            try {
+                //prepare the buffer and write the data to send into the buffer
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ObjectOutputStream oos = new ObjectOutputStream(baos);
+                oos.writeObject(data);
+                oos.flush();            
+
+                //create data package and send
+                byte[] sendData = baos.toByteArray();
+                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(udpServerAddress.getHost()), udpServerAddress.getPort());
+                udpClient.send(sendPacket);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.out.println("Error in sending data package");
+                return false;
+            }
+            return true;
+        }
+        
+        public ObjectWrapper receiveData() {
+            ObjectWrapper result = null;
+            try {   
+                //prepare the buffer and fetch the received data into the buffer
+                byte[] receiveData = new byte[1024 * 5];
+                DatagramPacket receivePacket = new  DatagramPacket(receiveData, receiveData.length);
+                udpClient.receive(receivePacket);
+
+                //read incoming data from the buffer 
+                ByteArrayInputStream bais = new ByteArrayInputStream(receiveData);
+                ObjectInputStream ois = new ObjectInputStream(bais);
+                result = (ObjectWrapper)ois.readObject();
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.out.println("Error in receiving data package");
+            }
+            return result;
+        }
+        
+        //END-=-----------------------------------------
          
         public void run() { 
             try {
@@ -142,23 +234,26 @@ public class ServerCtr {
                             if(o instanceof ObjectWrapper){ 
                                 ObjectWrapper data = (ObjectWrapper)o;
                                 if (data.getChoice() == ConnectionType.LOGIN) {
-                                    System.out.println("Login");
+                                    System.out.println("Get Data Login");
                                     User user = (User)data.getData();
-                                    UserDAO dao = new UserDAO();
-                                    user = dao.checkLogin(user);
-    //                                if (user != null) {
-    //                                    
-    //                                }
-                                    if (user != null) {
-                                        this.idUser = user.getId();
-                                        new UserDAO().setOnlineOffline(idUser, true);
+                                    
+                                    //---------------UDP------------------------
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_LOGIN) {
+                                        this.idUser = ((User)received.getData()).getId();
+                                        sendData(received);
                                     }
-                                    sendData(new ObjectWrapper(user, ConnectionType.REPLY_LOGIN));
+
                                 } else if (data.getChoice() == ConnectionType.REGISTER){
                                     User user = (User)data.getData();
-                                    UserDAO dao = new UserDAO();
-                                    String rs = dao.createAccount(user) == true ? "ok" : "false";
-                                    sendData(new ObjectWrapper(rs, ConnectionType.REPLY_REGISTER));
+                                    
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_REGISTER) {
+                                        sendData(received);
+                                    }
+                                    
                                 } else if (data.getChoice() == ConnectionType.ONLINE_INFORM) {
                                     int user = (int)data.getData();
                                     this.idUser = user;
@@ -169,81 +264,102 @@ public class ServerCtr {
                                     sendDataAll(sendToAll);
                                 } else if (data.getChoice() == ConnectionType.GETFRIEND) {
                                     int idUser = (int)data.getData();
-                                    List<User> listFriend = new FriendDAO().getFriends(idUser);
-                                    ObjectWrapper sender = new ObjectWrapper(listFriend, ConnectionType.REPLY_GETFRIEND);
-                                    sendData(sender);
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_GETFRIEND) {
+                                        sendData(new ObjectWrapper(received.getData(), ConnectionType.REPLY_REGISTER));
+                                    }
                                 } else if (data.getChoice() == ConnectionType.CHAT) {
 
                                     Message message = (Message) data.getData();
                                     System.out.println("Nhan duoc tin nhan: " + message.getContent() + 
                                             "\nDen room: " + message.getRoom().getId() + 
                                             "\nTu user: " + message.getAuthor().getFullName());
-                                    if (new MessageDAO().saveMessage(message)) {
-                                        List<Message> list = new MessageDAO().getMessages(message.getRoom().getId());
-                                        ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_CHAT);
-                                        sendDataAll(sender);
-                                        System.out.println("Sent To Client");
-                                    } else {
-                                        System.out.println("Loi khi save Message");
+                                    
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_CHAT) {
+                                        sendDataAll(received);
                                     }
+                                    
+                                    
                                 } else if( data.getChoice() == ConnectionType.FRIENDREQUEST ) {
 
-                                    FriendRequest fr = (FriendRequest)data.getData();
-                                    new FriendRequestDAO().sendRequest(fr);
-                                    ObjectWrapper sender = new ObjectWrapper(fr, ConnectionType.REPLY_FRIENDREQUEST);
-                                    sendData(sender);
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_FRIENDREQUEST) {
+                                        sendData(received);
+                                    }
+                                    
                                 } else if (data.getChoice() == ConnectionType.ADDFRIEND) {
 
-                                    FriendRequest fr = (FriendRequest)data.getData();
-                                    new FriendRequestDAO().acceptRequest(fr);
-//                                    List<User> friendList = new FriendDAO().getFriends(fr.getReceiver().getId());
-//                                    List<Object> list = new ArrayList<Object>();
-//                                    list.add(fr.getReceiver().getId());
-//                                    list.add(list);
-//                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_ADDFRIEND);
-    //                                sendDataAll(sender);
+                                    sendDataToUDP(data);
+                                    
+//                                    FriendRequest fr = (FriendRequest)data.getData();
+//                                    new FriendRequestDAO().acceptRequest(fr);
 
                                 } else if (data.getChoice() == ConnectionType.DECLINEFRIEND) {
-                                    FriendRequest fr = (FriendRequest)data.getData();
-                                    new FriendRequestDAO().deleteRequest(fr);
-//                                    List<User> friendList = new FriendDAO().getFriends(fr.getReceiver().getId());
-//
-//                                    List<Object> list = new ArrayList<Object>();
-//                                    list.add(fr.getReceiver().getId());
-//                                    list.add(list);
-//
-//                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_DECLINEFRIEND);
-    //                                sendData(sender);
-    //                                sendDataAll(sender);
+                                    sendDataToUDP(data);
+
+//                                    FriendRequest fr = (FriendRequest)data.getData();
+//                                    new FriendRequestDAO().deleteRequest(fr);
+
                                 } else if( data.getChoice() == ConnectionType.INVITEROOM ) {
 
                                 } else if ( data.getChoice() == ConnectionType.GETROOM) {
-                                    int userId = (int)data.getData();
-                                    List<Room> listRoom = new UserInRoomDAO().getListRoom(userId);
-                                    ObjectWrapper sender = new ObjectWrapper(listRoom, ConnectionType.REPLY_GETROOM);
-                                    sendData(sender);
-                                    System.out.println("Get Request Update Room UI");
+                                    
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_GETROOM) {
+                                        sendData(received);
+                                    }
+//                                    int userId = (int)data.getData();
+//                                    List<Room> listRoom = new UserInRoomDAO().getListRoom(userId);
+//                                    ObjectWrapper sender = new ObjectWrapper(listRoom, ConnectionType.REPLY_GETROOM);
+//                                    sendData(sender);
+//                                    System.out.println("Get Request Update Room UI");
+
                                 } else if (data.getChoice() == ConnectionType.GETROOMFRIEND) {
-                                    List<Object> list = (List<Object>) data.getData();
-                                    Room room = new UserInRoomDAO().getRoomOfJust2People((int)list.get(0), (int)list.get(1));
-                                    ObjectWrapper sender = new ObjectWrapper(room, ConnectionType.REPLY_GETROOMFRIEND);
-                                    sendData(sender);
+                                    
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_GETROOMFRIEND) {
+                                        sendData(received);
+                                    }
+                                    
                                 } else if (data.getChoice() == ConnectionType.GETFRIENDREQUEST){
-                                    int userid = (int)data.getData();
-                                    List<FriendRequest> list = new FriendRequestDAO().getFriendRequests(userid);
-                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_GETFRIENDREQUEST);
-                                    sendData(sender);
+                                    
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_GETFRIENDREQUEST) {
+                                        sendData(received);
+                                    }
+                                    
+//                                    int userid = (int)data.getData();
+//                                    List<FriendRequest> list = new FriendRequestDAO().getFriendRequests(userid);
+//                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_GETFRIENDREQUEST);
+//                                    sendData(sender);
                                 } else if (data.getChoice() == ConnectionType.SEARCH) {
-                                    String key = (String)data.getData();
-                                    List<User> list = new UserDAO().findUsersByFullName(key);
-                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_SEARCH);
-                                    sendData(sender);
+                                    
+                                    sendDataToUDP(data);
+                                    ObjectWrapper received = receiveData();
+                                    if (received.getChoice() == ConnectionType.REPLY_SEARCH) {
+                                        sendData(received);
+                                    }
+                                    
+//                                    String key = (String)data.getData();
+//                                    List<User> list = new UserDAO().findUsersByFullName(key);
+//                                    ObjectWrapper sender = new ObjectWrapper(list, ConnectionType.REPLY_SEARCH);
+//                                    sendData(sender);
                                 } else if (data.getChoice() == ConnectionType.CREATEROOM) {
-                                    List<User> list = (List<User>) data.getData();
-                                    new RoomDAO().createRoom(list);
+                                    sendDataToUDP(data);
+                                   
+//                                    List<User> list = (List<User>) data.getData();
+//                                    new RoomDAO().createRoom(list);
                                 } else if (data.getChoice() == ConnectionType.EDITPROFILE) {
-                                    User u = (User)data.getData();
-                                    new UserDAO().updateAccount(u);
+                                    sendDataToUDP(data);
+//                                    User u = (User)data.getData();
+//                                    new UserDAO().updateAccount(u);
                                 }
                             } 
                         }
@@ -253,7 +369,16 @@ public class ServerCtr {
                     //e.printStackTrace();
                     myProcess.remove(this);
                         System.out.println("Number of client connecting to the server: " + myProcess.size());
-                        new UserDAO().setOnlineOffline(idUser, false);
+                        
+                        sendDataToUDP(new ObjectWrapper(idUser, ConnectionType.OFFLINE_INFORM));
+                        
+//                        new UserDAO().setOnlineOffline(idUser, false);
+                        for (int i = 0; i < listPortUDP.size(); i++) {
+                            if (listPortUDP.get(i) == this.port) {
+                                listPortUDP.remove(listPortUDP.get(i));
+                                break;
+                            }
+                        }
     //                publicClientNumber();
                     try {
                         mySocket.close();
@@ -268,7 +393,7 @@ public class ServerCtr {
     }
     
     public static void main(String[] args) {
-        new ServerCtr( new IPAddress("192.168.1.106",  9086) );
         new UDPCtr(1000);
+        new ServerCtr( new IPAddress("localhost",  9086) );
     }
 }
