@@ -20,6 +20,7 @@ import java.util.ArrayList;
  
 import dao.UserDAO;
 import dao.UserInRoomDAO;
+import interfacecontrol.IUserCtr;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.DatagramPacket;
@@ -36,33 +37,49 @@ import model.ObjectWrapper;
 import model.Room;
 import model.User;
 import model.UserInRoom;
+import interfacecontrol.*;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.ExportException;
+import java.rmi.server.UnicastRemoteObject;
  
-public class ServerCtr {
+public class ServerCtr{
     public static ArrayList<Integer> listPortUDP = new ArrayList<Integer>();
     
     //--------------------TCP------------------------------
     private ServerSocket myServer;
     private ServerListening myListening;
     private ArrayList<ServerProcessing> myProcess;
-    private IPAddress myAddress = new IPAddress("192.168.1.103",8888);  //default server host and port
+    private IPAddress myAddress = new IPAddress("192.168.1.103",9999);  //default server host and port
     
     //---------------------UDP------------------------------
     private IPAddress udpServerAddress = new IPAddress("localhost", 1000);
     
+    //----------------------Event Listener------------------------
+   
     
+    private RMICtr eventListener;
      
     public ServerCtr(IPAddress ip){
+        
         myProcess = new ArrayList<ServerProcessing>();
         myAddress = ip;
+        eventListener = new RMICtr();
+
         openServer();       
+
     }
      
      
     private void openServer(){
         try {
+
             myServer = new ServerSocket(myAddress.getPort());
+            
             myListening = new ServerListening();
             myListening.start();
+
 //            myAddress.setHost(InetAddress.get().getHostAddress());
             //System.out.println("server started!");
             System.out.println("TCP server is running at the port " + myAddress.getPort() +"...");
@@ -70,7 +87,8 @@ public class ServerCtr {
             e.printStackTrace();;
         }
     }
-     
+    
+   
     public void stopServer() {
         try {
             for(ServerProcessing sp:myProcess)
@@ -160,6 +178,7 @@ public class ServerCtr {
          
         public ServerProcessing(Socket s) {
             super();
+            idUser = -1;
             mySocket = s;
             port = getPortForUDPServer();
             try {
@@ -235,7 +254,6 @@ public class ServerCtr {
                                 ObjectWrapper data = (ObjectWrapper)o;
                                 if (data.getChoice() == ConnectionType.LOGIN) {
                                     System.out.println("Get Data Login");
-                                    User user = (User)data.getData();
                                     
                                     //---------------UDP------------------------
                                     sendDataToUDP(data);
@@ -279,6 +297,7 @@ public class ServerCtr {
                                     sendDataToUDP(data);
                                     ObjectWrapper received = receiveData();
                                     if (received.getChoice() == ConnectionType.REPLY_CHAT) {
+                                        System.out.println("Send Message to all");
                                         sendDataAll(received);
                                     }
                                     
@@ -369,9 +388,9 @@ public class ServerCtr {
                     //e.printStackTrace();
                     myProcess.remove(this);
                         System.out.println("Number of client connecting to the server: " + myProcess.size());
-                        
-                        sendDataToUDP(new ObjectWrapper(idUser, ConnectionType.OFFLINE_INFORM));
-                        
+                        if (idUser > -1) {
+                            sendDataToUDP(new ObjectWrapper(idUser, ConnectionType.OFFLINE_INFORM));
+                        }
 //                        new UserDAO().setOnlineOffline(idUser, false);
                         for (int i = 0; i < listPortUDP.size(); i++) {
                             if (listPortUDP.get(i) == this.port) {
@@ -392,7 +411,7 @@ public class ServerCtr {
         }
     }
     
-    public static void main(String[] args) {
+    public static void main(String[] args) throws RemoteException {
         new UDPCtr(1000);
         new ServerCtr( new IPAddress("localhost",  9086) );
     }

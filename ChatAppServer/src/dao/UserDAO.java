@@ -37,7 +37,7 @@ public class UserDAO extends DAO{
                 user.setEmail(rs.getString("email"));
                 user.setPhoneNum(rs.getString("phone"));
                 user.setAvatarUrl(rs.getString("avatarurl"));
-                user.setStatus(rs.getInt("status"));
+                user.setStatus(1);
                 user.setFriendList(new FriendDAO().getFriends(user.getId()));
                 user.setRoomList(new UserInRoomDAO().getListRoom(user.getId()));
                 user.setFriendRequestList(new FriendRequestDAO().getFriendRequests(user.getId()));

@@ -77,7 +77,7 @@ public class UDPCtr {
             while(true) {               
                 try {   
                     //prepare the buffer and fetch the received data into the buffer
-                    byte[] receiveData = new byte[1024 * 5];
+                    byte[] receiveData = new byte[1024 * 6];
                     DatagramPacket receivePacket = new  DatagramPacket(receiveData, receiveData.length);
                     myServer.receive(receivePacket);
                      
