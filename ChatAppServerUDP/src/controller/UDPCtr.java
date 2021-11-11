@@ -193,4 +193,8 @@ public class UDPCtr {
             }
         }
     }
+    
+    public static void main(String[] args) {
+        new UDPCtr(1000);
+    }
 }

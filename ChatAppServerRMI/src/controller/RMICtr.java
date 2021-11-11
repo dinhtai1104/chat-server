@@ -159,4 +159,10 @@ class RMICtr implements IService{
     public List<User> getUsersInRoom(int roomId) {
         return userInRoomDAO.getUsersInRoom(roomId);
     }
+    
+    
+    
+    public static void main(String[] args) {
+        new RMICtr();
+    }
 }

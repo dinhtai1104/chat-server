@@ -5,10 +5,6 @@
  */
 package controller;
 
-import dao.FriendDAO;
-import dao.FriendRequestDAO;
-import dao.MessageDAO;
-import dao.RoomDAO;
 import java.io.EOFException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -17,10 +13,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
- 
-import dao.UserDAO;
-import dao.UserInRoomDAO;
-import interfacecontrol.IUserCtr;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.DatagramPacket;
@@ -59,13 +51,11 @@ public class ServerCtr{
     //----------------------Event Listener------------------------
    
     
-    private RMICtr eventListener;
      
     public ServerCtr(IPAddress ip){
         
         myProcess = new ArrayList<ServerProcessing>();
         myAddress = ip;
-        eventListener = new RMICtr();
 
         openServer();       
 
@@ -275,7 +265,6 @@ public class ServerCtr{
                                 } else if (data.getChoice() == ConnectionType.ONLINE_INFORM) {
                                     int user = (int)data.getData();
                                     this.idUser = user;
-                                    new UserDAO().setOnlineOffline(idUser, true);
                                 } else if (data.getChoice() == ConnectionType.OFFLINE_INFORM) {
                                     User user = (User)data.getData();
                                     ObjectWrapper sendToAll = new ObjectWrapper(user.getId(), ConnectionType.OFFLINE_INFORM);
@@ -412,7 +401,7 @@ public class ServerCtr{
     }
     
     public static void main(String[] args) throws RemoteException {
-        new UDPCtr(1000);
+//        new UDPCtr(1000);
         new ServerCtr( new IPAddress("localhost",  9086) );
     }
 }
