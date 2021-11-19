@@ -5,10 +5,6 @@
  */
 package controller;
 
-import dao.FriendDAO;
-import dao.FriendRequestDAO;
-import dao.MessageDAO;
-import dao.RoomDAO;
 import java.io.EOFException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -18,8 +14,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
  
-import dao.UserDAO;
-import dao.UserInRoomDAO;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.DatagramPacket;
@@ -207,7 +201,7 @@ public class ServerCtr {
             ObjectWrapper result = null;
             try {   
                 //prepare the buffer and fetch the received data into the buffer
-                byte[] receiveData = new byte[1024 * 5];
+                byte[] receiveData = new byte[1024 * 6];
                 DatagramPacket receivePacket = new  DatagramPacket(receiveData, receiveData.length);
                 udpClient.receive(receivePacket);
 
@@ -257,7 +251,6 @@ public class ServerCtr {
                                 } else if (data.getChoice() == ConnectionType.ONLINE_INFORM) {
                                     int user = (int)data.getData();
                                     this.idUser = user;
-                                    new UserDAO().setOnlineOffline(idUser, true);
                                 } else if (data.getChoice() == ConnectionType.OFFLINE_INFORM) {
                                     User user = (User)data.getData();
                                     ObjectWrapper sendToAll = new ObjectWrapper(user.getId(), ConnectionType.OFFLINE_INFORM);
@@ -294,13 +287,14 @@ public class ServerCtr {
                                 } else if (data.getChoice() == ConnectionType.ADDFRIEND) {
 
                                     sendDataToUDP(data);
-                                    
+                                    sendData(new ObjectWrapper("ok", ConnectionType.REPLY_ADDFRIEND));
+
 //                                    FriendRequest fr = (FriendRequest)data.getData();
 //                                    new FriendRequestDAO().acceptRequest(fr);
 
                                 } else if (data.getChoice() == ConnectionType.DECLINEFRIEND) {
                                     sendDataToUDP(data);
-
+                                    sendData(new ObjectWrapper("ok", ConnectionType.REPLY_DECLINEFRIEND));
 //                                    FriendRequest fr = (FriendRequest)data.getData();
 //                                    new FriendRequestDAO().deleteRequest(fr);
 
@@ -353,11 +347,13 @@ public class ServerCtr {
 //                                    sendData(sender);
                                 } else if (data.getChoice() == ConnectionType.CREATEROOM) {
                                     sendDataToUDP(data);
-                                   
+                                   sendData(new ObjectWrapper("ok", ConnectionType.REPLY_CREATEROOM));
 //                                    List<User> list = (List<User>) data.getData();
 //                                    new RoomDAO().createRoom(list);
                                 } else if (data.getChoice() == ConnectionType.EDITPROFILE) {
                                     sendDataToUDP(data);
+                                    sendData(new ObjectWrapper("ok", ConnectionType.REPLY_EDITPROFILE));
+
 //                                    User u = (User)data.getData();
 //                                    new UserDAO().updateAccount(u);
                                 }
@@ -393,7 +389,6 @@ public class ServerCtr {
     }
     
     public static void main(String[] args) {
-        new UDPCtr(1000);
         new ServerCtr( new IPAddress("localhost",  9086) );
     }
 }
